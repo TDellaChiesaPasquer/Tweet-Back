@@ -1,5 +1,6 @@
 var express = require("express");
 var router = express.Router();
+const mongoose = require("mongoose");
 const { body, validationResult } = require("express-validator");
 const Tweet = require("../models/tweets");
 const User = require("../models/users");
@@ -22,12 +23,12 @@ router.get("/", async (req, res) => {
 	}
 });
 
-// POST /tweets/add
+// POST /tweets
 // Adds one tweet from one user
 // Takes, in body
 // user_token, text content of the tweet
 router.post(
-	"/add",
+	"/",
 	authenticateToken,
 	body("content").isString().trim().isLength({ min: 1, max: 280 }).escape(),
 	async (req, res) => {
@@ -47,13 +48,13 @@ router.post(
 
 			const savedTweet = await tweet.save();
 
-      // Ajoute l'objectId du tweet au tableau de tweets des users
-			User.findByIdAndUpdate(
-				req.userId,
-				{ $push: { tweetsOwned: savedTweet._id } }
-			);
+			// Ajoute l'objectId du tweet au tableau de tweets des users
+			const addedTweetUser = await User.findByIdAndUpdate(req.userId, {
+				$push: { tweetsOwned: savedTweet._id },
+			});
 
-			res.json({ result: true });
+			// Renvoie true seulement si les 2 ajouts ont eu lieu.
+			res.json({ result: true	});
 		} catch (error) {
 			console.log(error);
 			res.json({
@@ -63,5 +64,28 @@ router.post(
 		}
 	}
 );
+
+// DELETE /tweets/
+// Delets one tweet from one user
+// Takes, in body
+// user_token, tweet_id
+router.delete("/", authenticateToken, async (req, res) => {
+	try {
+		// Retire l'objectId du tweet au tableau de tweets des users
+		await Tweet.findByIdAndDelete(req.body.tweetId);
+		await User.findByIdAndUpdate(req.userId, {
+			$pull: { tweetsOwned: req.body.tweetId },
+		});
+
+		// Renvoie true seulement si les 2 suppressions ont eu lieu.
+		res.json({ result: true });
+	} catch (error) {
+		console.log(error);
+		res.json({
+			result: false,
+			error: "Server error.",
+		});
+	}
+});
 
 module.exports = router;
