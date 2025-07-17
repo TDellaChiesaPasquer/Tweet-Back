@@ -2,7 +2,8 @@ var express = require("express");
 var router = express.Router();
 const { body, validationResult } = require("express-validator");
 const Tweet = require("../models/tweets");
-const generateAccessToken = require("../middlewares/generateAccessToken");
+const User = require("../models/users");
+const { generateAccessToken, authenticateToken } = require("../modules/jwt");
 
 // GET /tweets
 // Returns all tweets
@@ -24,7 +25,7 @@ router.get("/", async (req, res) => {
 // POST /tweets/add
 // Adds one tweet from one user
 // Takes, in body
-// user_id, user_token, text content of the tweet
+// user_token, text content of the tweet
 router.post(
 	"/add",
 	authenticateToken,
@@ -39,14 +40,20 @@ router.post(
 			}
 			const { content } = req.body;
 
-      const tweet = new Tweet({
+			const tweet = new Tweet({
 				creator: req.userId,
 				content,
 			});
 
 			const savedTweet = await tweet.save();
 
-			res.json({ result: true, tweet: savedTweet });
+      // Ajoute l'objectId du tweet au tableau de tweets des users
+			User.findByIdAndUpdate(
+				req.userId,
+				{ $push: { tweetsOwned: savedTweet._id } }
+			);
+
+			res.json({ result: true });
 		} catch (error) {
 			console.log(error);
 			res.json({
