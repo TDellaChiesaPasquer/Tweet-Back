@@ -118,4 +118,14 @@ router.delete("/", authenticateToken,
 	}
 });
 
+router.get('/trends', async (req, res, next) => {
+    try {
+        const hashtagList = await Hashtag.find();
+        res.json({result: true, hashtagList: hashtagList.map(e => {return {title: e.title, number: e.tweetList.length}}).sort((a,b) => b.number - a.number)});
+    } catch(error) {
+        console.log(error);
+        res.json({result: false, error: 'Server error'});
+    }
+})
+
 module.exports = router;
