@@ -65,7 +65,7 @@ router.post(
                 await Hashtag.findByIdAndUpdate(possibleHashtag._id, {$push: {tweetList: savedTweet._id}});
             }
 			// Renvoie true seulement si les 2 ajouts ont eu lieu.
-			res.json({ result: true});
+			res.json({ result: true, tweet: savedTweet});
 		} catch (error) {
 			console.log(error);
 			res.json({
