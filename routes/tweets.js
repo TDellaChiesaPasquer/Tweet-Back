@@ -13,7 +13,7 @@ const { generateAccessToken, authenticateToken } = require("../modules/jwt");
 // Ajouter des tweet, pour le moment renvoie un tableau vide, mais il n'y a aucun tweet -> tester avec des tweets
 router.get("/", async (req, res) => {
 	try {
-		data = await Tweet.find();
+		data = await Tweet.find().populate("creator");
 		res.json({ result: true, tweets: data });
 	} catch (error) {
 		console.log(error);
@@ -65,7 +65,7 @@ router.post(
                 await Hashtag.findByIdAndUpdate(possibleHashtag._id, {$push: {tweetList: savedTweet._id}});
             }
 			// Renvoie true seulement si les 2 ajouts ont eu lieu.
-			res.json({ result: true, tweet: savedTweet});
+			res.json({ result: true, tweet: savedTweet });
 		} catch (error) {
 			console.log(error);
 			res.json({
