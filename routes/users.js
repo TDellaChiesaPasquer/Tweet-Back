@@ -8,6 +8,7 @@ const User = require('../models/users');
 
 router.post('/signup', 
     body('username').isString().trim().isLength({min: 3, max: 32}).escape(),
+    body('name').isString().trim().isLength({min: 3, max: 32}).escape(),
     body('password').isString().isLength({min: 8, max: 32}).escape(),
     body('email').isEmail(),
     async (req, res, next)  => {
@@ -26,6 +27,7 @@ router.post('/signup',
             }
             const secPassword = bcrypt.hashSync(req.body.password, 10);
             const newUser = new User({
+                name: req.body.name,
                 username: req.body.username,
                 password: secPassword,
                 email: req.body.email,
