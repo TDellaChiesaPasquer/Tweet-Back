@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const { body, validationResult } = require("express-validator");
 const Tweet = require("../models/tweets");
 const User = require("../models/users");
+const Hashtag = require('../models/hashtags');
 const { generateAccessToken, authenticateToken } = require("../modules/jwt");
 
 // GET /tweets
@@ -49,12 +50,22 @@ router.post(
 			const savedTweet = await tweet.save();
 
 			// Ajoute l'objectId du tweet au tableau de tweets des users
-			const addedTweetUser = await User.findByIdAndUpdate(req.userId, {
+			await User.findByIdAndUpdate(req.userId, {
 				$push: { tweetsOwned: savedTweet._id },
 			});
-
+            let hashtagList = content.match(/#[a-z]+/gi);
+            hashtagList = [...new Set(hashtagList)];
+            for (const element of hashtagList) {
+                const possibleHashtag = await Hashtag.findOne({title: element});
+                if (!possibleHashtag) {
+                    const newHashtag = new Hashtag({title: element, tweetList: [savedTweet._id]});
+                    newHashtag.save();
+                    continue;
+                }
+                await Hashtag.findByIdAndUpdate(possibleHashtag._id, {$push: {tweetList: savedTweet._id}});
+            }
 			// Renvoie true seulement si les 2 ajouts ont eu lieu.
-			res.json({ result: true, tweet: savedTweet	});
+			res.json({ result: true, tweet: savedTweet });
 		} catch (error) {
 			console.log(error);
 			res.json({
@@ -69,16 +80,35 @@ router.post(
 // Delets one tweet from one user
 // Takes, in body
 // user_token, tweet_id
-router.delete("/", authenticateToken, async (req, res) => {
+router.delete("/", authenticateToken,
+	body("tweetId").isString().trim().isLength({ min: 1, max: 50 }).escape(),
+     async (req, res) => {
 	try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res
+                .status(400)
+                .json({ result: false, error: errors.array() });
+        }
 		// Retire l'objectId du tweet au tableau de tweets des users
-		await Tweet.findByIdAndDelete(req.body.tweetId);
+		const deletedTweet = await Tweet.findByIdAndDelete(req.body.tweetId);
 		await User.findByIdAndUpdate(req.userId, {
 			$pull: { tweetsOwned: req.body.tweetId },
 		});
-
-		// Renvoie true seulement si les 2 suppressions ont eu lieu.
-		res.json({ result: true });
+        let hashtagList = deletedTweet.content.match(/#[a-z]+/gi);
+        hashtagList = [...new Set(hashtagList)];
+        for (const element of hashtagList) {
+            const possibleHashtag = await Hashtag.findOne({title: element});
+            if (!possibleHashtag) {
+                continue;
+            }
+            if (possibleHashtag.length === 1) {
+                await Hashtag.findByIdAndDelete(possibleHashtag._id);
+                continue;
+            }
+            await Hashtag.findByIdAndUpdate(possibleHashtag._id, {$pull: {tweetList: deletedTweet._id}});
+        }
+		res.json({ result: true});
 	} catch (error) {
 		console.log(error);
 		res.json({
