@@ -5,8 +5,8 @@ const userSchema = mongoose.Schema({
 	email: String,
 	password: { type: String, select: false },
 	creationDate: Date,
-	tweetsOwned: { type: mongoose.Schema.Types.ObjectId, ref: "tweets" },
-	tweetsLiked: { type: mongoose.Schema.Types.ObjectId, ref: "tweets" },
+	tweetsOwned: [{ type: mongoose.Schema.Types.ObjectId, ref: "tweets" }],
+	tweetsLiked: [{ type: mongoose.Schema.Types.ObjectId, ref: "tweets" }],
 });
 
 const User = mongoose.model("users", userSchema);
