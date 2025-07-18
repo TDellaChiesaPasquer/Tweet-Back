@@ -52,7 +52,7 @@ router.post("/", authenticateToken, body("content").isString().trim().isLength({
 		hashtagList = [...new Set(hashtagList)];
 		for (const element of hashtagList) {
 			const possibleHashtag = await Hashtag.findOne({
-				title: element,
+				title: {$regex: new RegExp(element, 'i')}
 			});
 			if (!possibleHashtag) {
 				const newHashtag = new Hashtag({
@@ -264,9 +264,10 @@ router.post(
 			let hashtagList = content.match(/#[a-z]+/gi);
 			hashtagList = [...new Set(hashtagList)];
 			for (const element of hashtagList) {
+                const regex = new RegExp(element, 'i');
 				const possibleHashtag = await Hashtag.findOne({
-					title: element,
-				});
+                    title: {$regex: regex}
+                });
 				if (!possibleHashtag) {
 					const newHashtag = new Hashtag({
 						title: element,
