@@ -1,11 +1,12 @@
 var express = require("express");
 var router = express.Router();
 const mongoose = require("mongoose");
-const { body, validationResult } = require("express-validator");
+const { body, param, validationResult } = require("express-validator");
 const Tweet = require("../models/tweets");
 const User = require("../models/users");
 const Hashtag = require("../models/hashtags");
 const { generateAccessToken, authenticateToken } = require("../modules/jwt");
+const { populate } = require("dotenv");
 
 // GET /tweets
 // Returns all tweets
@@ -28,8 +29,6 @@ router.get("/", async (req, res) => {
 // Adds one tweet from one user
 // Takes, in body
 // user_token, text content of the tweet
-// Takes, in header (for authentication) :
-// - Authorization: string (token)
 router.post("/", authenticateToken, body("content").isString().trim().isLength({ min: 1, max: 280 }).escape(), async (req, res) => {
 	try {
 		const errors = validationResult(req);
@@ -82,8 +81,6 @@ router.post("/", authenticateToken, body("content").isString().trim().isLength({
 // Delets one tweet from one user
 // Takes, in body
 // user_token, tweet_id
-// Takes, in header (for authentication) :
-// - Authorization: string (token)
 router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength({ min: 1, max: 50 }).escape(), async (req, res) => {
 	try {
 		const errors = validationResult(req);
@@ -95,6 +92,7 @@ router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength
 		await User.findByIdAndUpdate(req.userId, {
 			$pull: { tweetsOwned: req.body.tweetId },
 		});
+		await Tweet.findByIdAndUpdate(req.deletedTweet.responseTo, { $pull: { responses: req.body.tweetId } });
 		let hashtagList = deletedTweet.content.match(/#[a-z]+/gi);
 		hashtagList = [...new Set(hashtagList)];
 		for (const element of hashtagList) {
@@ -191,6 +189,104 @@ router.put(
 		} catch (error) {
 			console.log(error);
 			res.json({ result: false, error: "Server error" });
+		}
+	}
+);
+
+router.get("/responses/:tweetId", param("tweetId").isString().trim().isLength({ min: 1, max: 50 }).escape(), async (req, res, next) => {
+	try {
+		const errors = validationResult(req);
+		if (!errors.isEmpty()) {
+			return res.status(400).json({ result: false, error: errors.array() });
+		}
+		const possibleTweet = await Tweet.findById(req.params.tweetId)
+			.populate("creator")
+			.populate("responses")
+			.populate("responseTo")
+			.populate({ path: "responseTo", populate: { path: "creator" } })
+			.populate({ path: "responses", populate: { path: "creator" } });
+		if (!possibleTweet) {
+			return res.json({ result: false, error: "Tweet not found" });
+		}
+		res.json({ result: true, tweet: possibleTweet });
+	} catch (error) {
+		console.log(error);
+		res.json({ result: false, error: "Server error" });
+	}
+});
+
+router.get("/", async (req, res) => {
+	try {
+		data = await Tweet.find().populate("creator").sort({ date: -1 });
+		res.json({ result: true, tweets: data });
+	} catch (error) {
+		console.log(error);
+		res.json({
+			result: false,
+			error: "Server error.",
+		});
+	}
+});
+
+// POST /tweets
+// Adds one tweet from one user
+// Takes, in body
+// user_token, text content of the tweet
+router.post(
+	"/response",
+	authenticateToken,
+	body("content").isString().trim().isLength({ min: 1, max: 280 }).escape(),
+	body("responseId").isString().trim().isLength({ min: 1, max: 50 }).escape(),
+	async (req, res) => {
+		try {
+			const errors = validationResult(req);
+			if (!errors.isEmpty()) {
+				return res.status(400).json({ result: false, error: errors.array() });
+			}
+			const { content } = req.body;
+			const possibleResponseTweet = await Tweet.findById(req.body.responseId);
+			if (!possibleResponseTweet) {
+				return res.json({ result: false, error: "Original tweet not found" });
+			}
+
+			const tweet = new Tweet({
+				creator: req.userId,
+				content,
+				responseTo: possibleResponseTweet._id,
+			});
+
+			const savedTweet = await tweet.save();
+			await Tweet.findByIdAndUpdate(req.body.responseId, { $push: { responses: savedTweet._id } });
+			// Ajoute l'objectId du tweet au tableau de tweets des users
+			await User.findByIdAndUpdate(req.userId, {
+				$push: { tweetsOwned: savedTweet._id },
+			});
+			let hashtagList = content.match(/#[a-z]+/gi);
+			hashtagList = [...new Set(hashtagList)];
+			for (const element of hashtagList) {
+				const possibleHashtag = await Hashtag.findOne({
+					title: element,
+				});
+				if (!possibleHashtag) {
+					const newHashtag = new Hashtag({
+						title: element,
+						tweetList: [savedTweet._id],
+					});
+					newHashtag.save();
+					continue;
+				}
+				await Hashtag.findByIdAndUpdate(possibleHashtag._id, {
+					$push: { tweetList: savedTweet._id },
+				});
+			}
+			// Renvoie true seulement si les 2 ajouts ont eu lieu.
+			res.json({ result: true, tweet: savedTweet });
+		} catch (error) {
+			console.log(error);
+			res.json({
+				result: false,
+				error: "Server error.",
+			});
 		}
 	}
 );
