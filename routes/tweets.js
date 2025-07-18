@@ -14,7 +14,7 @@ const { populate } = require("dotenv");
 // Ajouter des tweet, pour le moment renvoie un tableau vide, mais il n'y a aucun tweet -> tester avec des tweets
 router.get("/", async (req, res) => {
 	try {
-		data = await Tweet.find().populate("creator").sort({ date: -1 });
+		data = await Tweet.find().populate("creator").sort({ date: -1 }).populate({path: 'responseTo', populate: {path: 'creator'}});
 		res.json({ result: true, tweets: data });
 	} catch (error) {
 		console.log(error);
@@ -91,42 +91,30 @@ router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength
 		}
 		// Retire l'objectId du tweet au tableau de tweets des users
 		const deletedTweet = await Tweet.findByIdAndDelete(req.body.tweetId);
+        if (!deletedTweet) {
+            return res.json({result: true, message:'already deleted'});
+        }
 		await User.findByIdAndUpdate(req.userId, {
 			$pull: { tweetsOwned: req.body.tweetId },
 		});
-		await Tweet.findByIdAndUpdate(req.deletedTweet.responseTo, { $pull: { responses: req.body.tweetId } });
+		await Tweet.findByIdAndUpdate(deletedTweet.responseTo, { $pull: { responses: req.body.tweetId } });
 		let hashtagList = deletedTweet.content.match(/#[a-z]+/gi);
 		hashtagList = [...new Set(hashtagList)];
 		for (const element of hashtagList) {
 			const possibleHashtag = await Hashtag.findOne({
 				title: element,
 			});
-            await Tweet.findByIdAndUpdate(deletedTweet.responseTo, {$pull: {responses: req.body.tweetId}});
-			let hashtagList = deletedTweet.content.match(/#[a-z]+/gi);
-			hashtagList = [...new Set(hashtagList)];
-			for (const element of hashtagList) {
-				const possibleHashtag = await Hashtag.findOne({
-					title: {$regex : new RegExp(element, 'i')},
-				});
 				if (!possibleHashtag) {
-					continue;
-				}
-				if (possibleHashtag.length === 1) {
-					await Hashtag.findByIdAndDelete(possibleHashtag._id);
-					continue;
-				}
-				await Hashtag.findByIdAndUpdate(possibleHashtag._id, {
-					$pull: { tweetList: deletedTweet._id },
-				});
-			}
-			if (possibleHashtag.length === 1) {
-				await Hashtag.findByIdAndDelete(possibleHashtag._id);
-				continue;
-			}
-			await Hashtag.findByIdAndUpdate(possibleHashtag._id, {
-				$pull: { tweetList: deletedTweet._id },
-			});
-		}
+                continue;
+            }
+            if (possibleHashtag.length === 1) {
+                await Hashtag.findByIdAndDelete(possibleHashtag._id);
+                continue;
+            }
+            await Hashtag.findByIdAndUpdate(possibleHashtag._id, {
+                $pull: { tweetList: deletedTweet._id },
+            });
+        }
 		res.json({ result: true });
 	} catch (error) {
 		console.log(error);
