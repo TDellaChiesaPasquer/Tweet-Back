@@ -128,4 +128,40 @@ router.get('/trends', async (req, res, next) => {
     }
 })
 
+router.put('/like',
+    authenticateToken,
+    body("tweetId").isString().trim().isLength({ min: 1, max: 50 }).escape(),
+    body('liking').isBoolean().customSanitizer(value => value === 'true' || value === true),
+    async (req, res, next) => {
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(400).json({ result: false, error: errors.array() });
+            }
+            const user = await User.findById(req.userId);
+            const possibleTweet = await Tweet.findById(req.body.tweetId);
+            if (!possibleTweet) {
+                return res.json({result: false, error: 'Tweet not found'});
+            }
+            if (req.body.liking) {
+                if (possibleTweet.likes.some(e => e.toString() === req.userId.toString())) {
+                    return res.json({result : true, message : 'Already liked'});
+                }
+                await Tweet.findByIdAndUpdate(req.body.tweetId, {$push: {likes:req.userId}});
+                await User.findByIdAndUpdate(req.userId, {$push: {tweetsLiked: req.body.tweetId}})
+                return res.json({result: true});
+            }
+            if (!possibleTweet.likes.some(e => e.toString() === req.userId.toString())) {
+                return res.json({result : true, message : 'Already not liked'});
+            }
+            await Tweet.findByIdAndUpdate(req.body.tweetId, {$pull: {likes:req.userId}});
+            await User.findByIdAndUpdate(req.userId, {$pull: {tweetsLiked: req.body.tweetId}})
+            res.json({result: true});
+        } catch(error) {
+            console.log(error);
+            res.json({result: false, error: 'Server error'});
+        }
+    }
+)
+
 module.exports = router;
