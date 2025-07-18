@@ -111,7 +111,7 @@ router.delete(
 			hashtagList = [...new Set(hashtagList)];
 			for (const element of hashtagList) {
 				const possibleHashtag = await Hashtag.findOne({
-					title: element,
+					title: {$regex : new RegExp(element, 'i')},
 				});
 				if (!possibleHashtag) {
 					continue;
