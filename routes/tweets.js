@@ -80,7 +80,9 @@ router.post("/", authenticateToken, body("content").isString().trim().isLength({
 // DELETE /tweets/
 // Delets one tweet from one user
 // Takes, in body
-// user_token, tweet_id
+// - tweetId
+// Takes, in header (for authentication) :
+// - Authorization: string (token)
 router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength({ min: 1, max: 50 }).escape(), async (req, res) => {
 	try {
 		const errors = validationResult(req);
@@ -215,18 +217,6 @@ router.get("/responses/:tweetId", param("tweetId").isString().trim().isLength({ 
 	}
 });
 
-router.get("/", async (req, res) => {
-	try {
-		data = await Tweet.find().populate("creator").sort({ date: -1 });
-		res.json({ result: true, tweets: data });
-	} catch (error) {
-		console.log(error);
-		res.json({
-			result: false,
-			error: "Server error.",
-		});
-	}
-});
 
 // POST /tweets
 // Adds one tweet from one user
