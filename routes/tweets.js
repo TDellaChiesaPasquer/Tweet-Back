@@ -101,8 +101,23 @@ router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength
 			const possibleHashtag = await Hashtag.findOne({
 				title: element,
 			});
-			if (!possibleHashtag) {
-				continue;
+            await Tweet.findByIdAndUpdate(deletedTweet.responseTo, {$pull: {responses: req.body.tweetId}});
+			let hashtagList = deletedTweet.content.match(/#[a-z]+/gi);
+			hashtagList = [...new Set(hashtagList)];
+			for (const element of hashtagList) {
+				const possibleHashtag = await Hashtag.findOne({
+					title: element,
+				});
+				if (!possibleHashtag) {
+					continue;
+				}
+				if (possibleHashtag.length === 1) {
+					await Hashtag.findByIdAndDelete(possibleHashtag._id);
+					continue;
+				}
+				await Hashtag.findByIdAndUpdate(possibleHashtag._id, {
+					$pull: { tweetList: deletedTweet._id },
+				});
 			}
 			if (possibleHashtag.length === 1) {
 				await Hashtag.findByIdAndDelete(possibleHashtag._id);
