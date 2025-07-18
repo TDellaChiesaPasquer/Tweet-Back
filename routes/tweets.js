@@ -104,10 +104,10 @@ router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength
 			const possibleHashtag = await Hashtag.findOne({
 				title: element,
 			});
-				if (!possibleHashtag) {
+			if (!possibleHashtag) {
                 continue;
             }
-            if (possibleHashtag.length === 1) {
+            if (possibleHashtag.tweetList.length === 1) {
                 await Hashtag.findByIdAndDelete(possibleHashtag._id);
                 continue;
             }
