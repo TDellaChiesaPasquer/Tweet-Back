@@ -106,7 +106,7 @@ router.delete(
 			await User.findByIdAndUpdate(req.userId, {
 				$pull: { tweetsOwned: req.body.tweetId },
 			});
-            await Tweet.findByIdAndUpdate(req.deletedTweet.responseTo, {$pull: {responses: req.body.tweetId}});
+            await Tweet.findByIdAndUpdate(deletedTweet.responseTo, {$pull: {responses: req.body.tweetId}});
 			let hashtagList = deletedTweet.content.match(/#[a-z]+/gi);
 			hashtagList = [...new Set(hashtagList)];
 			for (const element of hashtagList) {
