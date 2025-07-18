@@ -48,41 +48,40 @@ router.post(
 				content,
 			});
 
-			const savedTweet = await tweet.save();
+		const savedTweet = await tweet.save();
 
-			// Ajoute l'objectId du tweet au tableau de tweets des users
-			await User.findByIdAndUpdate(req.userId, {
-				$push: { tweetsOwned: savedTweet._id },
+		// Ajoute l'objectId du tweet au tableau de tweets des users
+		await User.findByIdAndUpdate(req.userId, {
+			$push: { tweetsOwned: savedTweet._id },
+		});
+		let hashtagList = content.match(/#[a-z]+/gi);
+		hashtagList = [...new Set(hashtagList)];
+		for (const element of hashtagList) {
+			const possibleHashtag = await Hashtag.findOne({
+				title: element,
 			});
-			let hashtagList = content.match(/#[a-z]+/gi);
-			hashtagList = [...new Set(hashtagList)];
-			for (const element of hashtagList) {
-				const possibleHashtag = await Hashtag.findOne({
+			if (!possibleHashtag) {
+				const newHashtag = new Hashtag({
 					title: element,
+					tweetList: [savedTweet._id],
 				});
-				if (!possibleHashtag) {
-					const newHashtag = new Hashtag({
-						title: element,
-						tweetList: [savedTweet._id],
-					});
-					newHashtag.save();
-					continue;
-				}
-				await Hashtag.findByIdAndUpdate(possibleHashtag._id, {
-					$push: { tweetList: savedTweet._id },
-				});
+				newHashtag.save();
+				continue;
 			}
-			// Renvoie true seulement si les 2 ajouts ont eu lieu.
-			res.json({ result: true, tweet: savedTweet });
-		} catch (error) {
-			console.log(error);
-			res.json({
-				result: false,
-				error: "Server error.",
+			await Hashtag.findByIdAndUpdate(possibleHashtag._id, {
+				$push: { tweetList: savedTweet._id },
 			});
 		}
+		// Renvoie true seulement si les 2 ajouts ont eu lieu.
+		res.json({ result: true, tweet: savedTweet });
+	} catch (error) {
+		console.log(error);
+		res.json({
+			result: false,
+			error: "Server error.",
+		});
 	}
-);
+});
 
 // DELETE /tweets/
 // Delets one tweet from one user
@@ -136,6 +135,9 @@ router.delete(
 	}
 );
 
+// GET /tweets/trends/
+// Returns the list of hashtags sorted by number of tweets
+// No parameters required
 router.get("/trends", async (req, res, next) => {
 	try {
 		const hashtagList = await Hashtag.find();
@@ -153,6 +155,12 @@ router.get("/trends", async (req, res, next) => {
 	}
 });
 
+// PUT /tweets/like/
+// Likes or unlikes a tweet for a user
+// Takes, in body:
+// - tweetId: string (1 - 50 characters)
+// - liking: boolean (true to like, false to unlike)
+// Requires user authentication via token (in headers)
 router.put(
 	"/like",
 	authenticateToken,
@@ -164,9 +172,7 @@ router.put(
 		try {
 			const errors = validationResult(req);
 			if (!errors.isEmpty()) {
-				return res
-					.status(400)
-					.json({ result: false, error: errors.array() });
+				return res.status(400).json({ result: false, error: errors.array() });
 			}
 			const user = await User.findById(req.userId);
 			const possibleTweet = await Tweet.findById(req.body.tweetId);
@@ -174,11 +180,7 @@ router.put(
 				return res.json({ result: false, error: "Tweet not found" });
 			}
 			if (req.body.liking) {
-				if (
-					possibleTweet.likes.some(
-						(e) => e.toString() === req.userId.toString()
-					)
-				) {
+				if (possibleTweet.likes.some((e) => e.toString() === req.userId.toString())) {
 					return res.json({ result: true, message: "Already liked" });
 				}
 				await Tweet.findByIdAndUpdate(req.body.tweetId, {
@@ -189,11 +191,7 @@ router.put(
 				});
 				return res.json({ result: true });
 			}
-			if (
-				!possibleTweet.likes.some(
-					(e) => e.toString() === req.userId.toString()
-				)
-			) {
+			if (!possibleTweet.likes.some((e) => e.toString() === req.userId.toString())) {
 				return res.json({ result: true, message: "Already not liked" });
 			}
 			await Tweet.findByIdAndUpdate(req.body.tweetId, {
