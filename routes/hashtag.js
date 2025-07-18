@@ -15,7 +15,7 @@ router.get('/:title',
         }
         const possibleHashtag = await Hashtag.find({title: {$regex: new RegExp(`#${req.params.title}`, 'i')}}).populate('tweetList').populate({path:'tweetList', populate: {path:'creator'}});
         if (possibleHashtag.length === 0) {
-            return res.json({result: true, tweetList: []})
+            return res.json({result: true, tweetList: []});
         }
         const tweetList = [];
         for (const element of possibleHashtag) {
@@ -23,7 +23,7 @@ router.get('/:title',
                 tweetList.push(tweet);
             }
         }
-        res.json({result: true, tweetList: [...new Set(tweetList)]});
+        res.json({result: true, tweetList: [...new Set(tweetList)].sort((a,b) => b.date.valueOf() - a.date.valueOf())});
     } catch(error) {
         console.log(error);
         res.json({result: false, error: 'Server error'})
