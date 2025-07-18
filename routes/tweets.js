@@ -28,6 +28,8 @@ router.get("/", async (req, res) => {
 // Adds one tweet from one user
 // Takes, in body
 // user_token, text content of the tweet
+// Takes, in header (for authentication) :
+// - Authorization: string (token)
 router.post("/", authenticateToken, body("content").isString().trim().isLength({ min: 1, max: 280 }).escape(), async (req, res) => {
 	try {
 		const errors = validationResult(req);
@@ -80,6 +82,8 @@ router.post("/", authenticateToken, body("content").isString().trim().isLength({
 // Delets one tweet from one user
 // Takes, in body
 // user_token, tweet_id
+// Takes, in header (for authentication) :
+// - Authorization: string (token)
 router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength({ min: 1, max: 50 }).escape(), async (req, res) => {
 	try {
 		const errors = validationResult(req);
@@ -120,7 +124,6 @@ router.delete("/", authenticateToken, body("tweetId").isString().trim().isLength
 
 // GET /tweets/trends/
 // Returns the list of hashtags sorted by number of tweets
-// No parameters required
 router.get("/trends", async (req, res, next) => {
 	try {
 		const hashtagList = await Hashtag.find();
@@ -143,7 +146,8 @@ router.get("/trends", async (req, res, next) => {
 // Takes, in body:
 // - tweetId: string (1 - 50 characters)
 // - liking: boolean (true to like, false to unlike)
-// Requires user authentication via token (in headers)
+// Takes, in header (for authentication) :
+// - Authorization: string (token)
 router.put(
 	"/like",
 	authenticateToken,
